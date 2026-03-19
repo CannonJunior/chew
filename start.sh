@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Application port
-PORT=3000
+PORT=8983
 
 echo -e "${BLUE}🍽️  Chew - Food Intelligence Platform${NC}"
 echo -e "${BLUE}======================================${NC}\n"
