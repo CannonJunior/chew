@@ -70,22 +70,24 @@ export async function POST() {
 
   // Insert only new posts
   const newPosts = candidates.filter((c) => !existingSet.has(c.externalId));
-  for (const c of newPosts) {
-    db.insert(socialPosts).values({
-      id: newId(),
-      sourceId: c.sourceId,
-      externalId: c.externalId,
-      title: c.title,
-      description: c.description,
-      url: c.url,
-      imageUrl: c.imageUrl,
-      author: c.author,
-      publishedAt: c.publishedAt,
-      fetchedAt: ts,
-      tags: null,
-      liked: 0,
-      notes: null,
-    }).run();
+  if (newPosts.length > 0) {
+    db.insert(socialPosts).values(
+      newPosts.map((c) => ({
+        id: newId(),
+        sourceId: c.sourceId,
+        externalId: c.externalId,
+        title: c.title,
+        description: c.description,
+        url: c.url,
+        imageUrl: c.imageUrl,
+        author: c.author,
+        publishedAt: c.publishedAt,
+        fetchedAt: ts,
+        tags: null,
+        liked: 0,
+        notes: null,
+      }))
+    ).run();
   }
 
   // Update lastFetched for all successfully fetched sources

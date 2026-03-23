@@ -32,9 +32,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  db.delete(recipeMedia).where(eq(recipeMedia.recipeId, id)).run();
-  db.delete(recipeSteps).where(eq(recipeSteps.recipeId, id)).run();
-  db.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, id)).run();
-  db.delete(recipes).where(eq(recipes.id, id)).run();
+  db.transaction((tx) => {
+    tx.delete(recipeMedia).where(eq(recipeMedia.recipeId, id)).run();
+    tx.delete(recipeSteps).where(eq(recipeSteps.recipeId, id)).run();
+    tx.delete(recipeIngredients).where(eq(recipeIngredients.recipeId, id)).run();
+    tx.delete(recipes).where(eq(recipes.id, id)).run();
+  });
   return NextResponse.json({ ok: true });
 }

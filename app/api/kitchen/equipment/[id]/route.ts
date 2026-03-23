@@ -6,7 +6,12 @@ import { eq } from 'drizzle-orm';
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
-  db.update(kitchenEquipment).set(body).where(eq(kitchenEquipment.id, id)).run();
+  const { name, brand, model, category, subcategory, condition, notes, imagePath, purchasedDate } = body;
+  const update = Object.fromEntries(
+    Object.entries({ name, brand, model, category, subcategory, condition, notes, imagePath, purchasedDate })
+      .filter(([, v]) => v !== undefined)
+  );
+  db.update(kitchenEquipment).set(update).where(eq(kitchenEquipment.id, id)).run();
   return NextResponse.json({ ok: true });
 }
 

@@ -2,12 +2,16 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['better-sqlite3', 'sharp'],
+  turbopack: {
+    root: __dirname,
+  },
   images: {
-    domains: ['www.reddit.com', 'i.redd.it', 'external-preview.redd.it', 'food52.com'],
     remotePatterns: [
       { protocol: 'https', hostname: '**.redd.it' },
       { protocol: 'https', hostname: '**.reddit.com' },
       { protocol: 'https', hostname: 'i.ytimg.com' },
+      { protocol: 'https', hostname: 'www.reddit.com' },
+      { protocol: 'https', hostname: 'food52.com' },
     ],
   },
   async headers() {

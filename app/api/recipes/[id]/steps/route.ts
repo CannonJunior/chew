@@ -24,16 +24,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id: recipeId } = await params;
   const steps = await req.json() as Array<{ stepNumber: number; instruction: string; durationMin?: number; tip?: string }>;
   db.delete(recipeSteps).where(eq(recipeSteps.recipeId, recipeId)).run();
-  for (const s of steps) {
-    db.insert(recipeSteps).values({
-      id: newId(),
-      recipeId,
-      stepNumber: s.stepNumber,
-      instruction: s.instruction,
-      durationMin: s.durationMin ?? null,
-      tip: s.tip ?? null,
-      imagePath: null,
-    }).run();
+  if (steps.length > 0) {
+    db.insert(recipeSteps).values(
+      steps.map((s) => ({
+        id: newId(),
+        recipeId,
+        stepNumber: s.stepNumber,
+        instruction: s.instruction,
+        durationMin: s.durationMin ?? null,
+        tip: s.tip ?? null,
+        imagePath: null,
+      }))
+    ).run();
   }
   return NextResponse.json({ ok: true });
 }

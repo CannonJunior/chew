@@ -21,7 +21,14 @@ echo -e "${BLUE}======================================${NC}\n"
 # Check if port is in use
 echo -e "${YELLOW}🔍 Checking if port ${PORT} is in use...${NC}"
 
-PID=$(lsof -ti TCP:${PORT} -s TCP:LISTEN 2>/dev/null || true)
+port_pids() {
+    # Try lsof first, fall back to ss
+    lsof -ti TCP:${PORT} -s TCP:LISTEN 2>/dev/null \
+        || ss -tlnp | awk -F'[=,]' "/[*:]${PORT} /{for(i=1;i<=NF;i++) if(\$i~/^pid$/) print \$(i+1)}" \
+        || true
+}
+
+PID=$(port_pids)
 
 if [ -n "$PID" ]; then
     echo -e "${YELLOW}⚠️  Found process running on port ${PORT} (PID: ${PID})${NC}"
@@ -30,13 +37,13 @@ if [ -n "$PID" ]; then
     kill $PID 2>/dev/null || true
     sleep 2
 
-    if lsof -ti TCP:${PORT} -s TCP:LISTEN >/dev/null 2>&1; then
+    if [ -n "$(port_pids)" ]; then
         echo -e "${RED}⚠️  Process didn't stop gracefully, forcing...${NC}"
         kill -9 $PID 2>/dev/null || true
         sleep 1
     fi
 
-    if lsof -ti TCP:${PORT} -s TCP:LISTEN >/dev/null 2>&1; then
+    if [ -n "$(port_pids)" ]; then
         echo -e "${RED}❌ Failed to free port ${PORT}${NC}"
         echo -e "${RED}   Please manually kill the process and try again${NC}"
         exit 1
