@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Trash2, MapPin, Utensils } from 'lucide-react';
+import { Plus, Trash2, MapPin, Utensils, Star } from 'lucide-react';
+import { WishlistClient, type WishlistItem } from './WishlistClient';
 
 // Konva needs DOM
 const Stage = dynamic(() => import('react-konva').then((m) => m.Stage), { ssr: false });
@@ -148,13 +149,15 @@ function FloorplanCanvas({
 export function KitchenClient({
   initialEquipment,
   initialFloorplans,
+  initialWishlist,
 }: {
   initialEquipment: Equipment[];
   initialFloorplans: Floorplan[];
+  initialWishlist: WishlistItem[];
 }) {
   const [equipment, setEquipment] = useState(initialEquipment);
   const [floorplans, setFloorplans] = useState(initialFloorplans);
-  const [activeTab, setActiveTab] = useState<'equipment' | 'floorplan'>('equipment');
+  const [activeTab, setActiveTab] = useState<'equipment' | 'floorplan' | 'wishlist'>('equipment');
   const [showAddEq, setShowAddEq] = useState(false);
   const [eqForm, setEqForm] = useState({ name: '', brand: '', category: 'appliance', condition: 'good', notes: '' });
   const [savingEq, setSavingEq] = useState(false);
@@ -249,15 +252,24 @@ export function KitchenClient({
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b">
-        {(['equipment', 'floorplan'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-          >
-            {tab === 'equipment' ? <><Utensils className="w-4 h-4 inline mr-1" />Equipment</> : <><MapPin className="w-4 h-4 inline mr-1" />Floorplan</>}
-          </button>
-        ))}
+        <button
+          onClick={() => setActiveTab('equipment')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'equipment' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          <Utensils className="w-4 h-4 inline mr-1" />Equipment
+        </button>
+        <button
+          onClick={() => setActiveTab('floorplan')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'floorplan' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          <MapPin className="w-4 h-4 inline mr-1" />Floorplan
+        </button>
+        <button
+          onClick={() => setActiveTab('wishlist')}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'wishlist' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+        >
+          <Star className="w-4 h-4 inline mr-1" />Wish List
+        </button>
       </div>
 
       {activeTab === 'equipment' && (
@@ -343,6 +355,10 @@ export function KitchenClient({
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'wishlist' && (
+        <WishlistClient initialItems={initialWishlist} />
       )}
 
       {/* Add Equipment Dialog */}

@@ -160,6 +160,21 @@ export const floorplanAnnotations = sqliteTable('floorplan_annotations', {
   color: text('color').default('#4f46e5'),
 });
 
+export const kitchenWishlist = sqliteTable('kitchen_wishlist', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  brand: text('brand'),
+  category: text('category').default('tool'),
+  priority: text('priority').default('medium'), // high | medium | low
+  estimatedPrice: real('estimated_price'),
+  notes: text('notes'),
+  url: text('url'),
+  imageUrl: text('image_url'),
+  acquired: integer('acquired').default(0),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: integer('created_at').notNull(),
+});
+
 // ── Social ───────────────────────────────────────────────────────────────────
 
 export const socialSources = sqliteTable('social_sources', {

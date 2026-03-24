@@ -13,7 +13,10 @@
     "seed:wiki": "tsx lib/seed/fetch-usda.ts",
     "seed:curated": "tsx lib/seed/curated-ingredients.ts",
     "seed:recipes": "tsx lib/seed/curated-recipes.ts",
-    "seed:recipes2": "tsx lib/seed/curated-recipes2.ts"
+    "seed:recipes2": "tsx lib/seed/curated-recipes2.ts",
+    "seed:recipes3": "tsx lib/seed/curated-recipes3.ts",
+    "seed:recipes4": "tsx lib/seed/curated-recipes4.ts",
+    "seed:recipes5": "tsx lib/seed/curated-recipes5.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.118",

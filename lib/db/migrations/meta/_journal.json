@@ -16,5 +16,12 @@
       "tag": "0001_add_indexes",
       "breakpoints": true
     }
+    ,{
+      "idx": 2,
+      "version": "6",
+      "when": 1742700000000,
+      "tag": "0002_kitchen_wishlist",
+      "breakpoints": true
+    }
   ]
 }
