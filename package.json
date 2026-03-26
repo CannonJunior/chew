@@ -16,7 +16,8 @@
     "seed:recipes2": "tsx lib/seed/curated-recipes2.ts",
     "seed:recipes3": "tsx lib/seed/curated-recipes3.ts",
     "seed:recipes4": "tsx lib/seed/curated-recipes4.ts",
-    "seed:recipes5": "tsx lib/seed/curated-recipes5.ts"
+    "seed:recipes5": "tsx lib/seed/curated-recipes5.ts",
+    "seed:recipes6": "tsx lib/seed/curated-recipes6.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.118",
