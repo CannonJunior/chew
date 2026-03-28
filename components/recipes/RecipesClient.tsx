@@ -363,7 +363,7 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
                     <CardTitle className="text-base leading-tight">{r.title}</CardTitle>
                     <div className="flex items-center gap-1 shrink-0">
                       {newImageRecipes.has(r.id) && (
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400" title="New image found" />
+                        <span title="New image found"><Sparkles className="w-3.5 h-3.5 text-amber-400" /></span>
                       )}
                       <button
                         onClick={(e) => toggleVote(r.id, 'up', e)}

@@ -146,6 +146,9 @@ function FloorplanCanvas({
   );
 }
 
+// Two-slot crossfade state
+type Slots = { a: string | null; b: string | null; active: 'a' | 'b' };
+
 export function KitchenClient({
   initialEquipment,
   initialFloorplans,
@@ -164,6 +167,64 @@ export function KitchenClient({
   const [selectedFloorplan, setSelectedFloorplan] = useState<Floorplan | null>(floorplans[0] ?? null);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [uploadingFp, setUploadingFp] = useState(false);
+
+  // Image preview state for equipment
+  const [slots, setSlots] = useState<Slots>({ a: null, b: null, active: 'a' });
+  const [hoveredName, setHoveredName] = useState<string | null>(null);
+  const imageCacheRef = useRef<Map<string, string[]>>(new Map());
+  const fetchPromisesRef = useRef<Map<string, Promise<string[]>>>(new Map());
+  const cycleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cycleIndexRef = useRef(0);
+
+  useEffect(() => () => { if (cycleTimerRef.current) clearInterval(cycleTimerRef.current); }, []);
+
+  const showImage = useCallback((url: string) => {
+    setSlots((prev) => {
+      const next = prev.active === 'a' ? 'b' : 'a';
+      return { ...prev, [next]: url, active: next };
+    });
+  }, []);
+
+  const startCycle = useCallback((images: string[]) => {
+    if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
+    if (!images.length) return;
+    cycleIndexRef.current = 0;
+    showImage(images[0]);
+    if (images.length === 1) return;
+    cycleTimerRef.current = setInterval(() => {
+      cycleIndexRef.current = (cycleIndexRef.current + 1) % images.length;
+      showImage(images[cycleIndexRef.current]);
+    }, 5000);
+  }, [showImage]);
+
+  const fetchEqImages = useCallback(async (eq: Equipment): Promise<string[]> => {
+    const cached = imageCacheRef.current.get(eq.id);
+    if (cached !== undefined) return cached;
+    const existing = fetchPromisesRef.current.get(eq.id);
+    if (existing) return existing;
+    const query = [eq.brand, eq.name].filter(Boolean).join(' ');
+    const promise = (async () => {
+      try {
+        const res = await fetch(`/api/kitchen/image?q=${encodeURIComponent(query)}`);
+        const { images } = await res.json() as { images: string[] };
+        imageCacheRef.current.set(eq.id, images);
+        return images;
+      } catch {
+        imageCacheRef.current.set(eq.id, []);
+        return [] as string[];
+      } finally {
+        fetchPromisesRef.current.delete(eq.id);
+      }
+    })();
+    fetchPromisesRef.current.set(eq.id, promise);
+    return promise;
+  }, []);
+
+  const handleEqHover = useCallback(async (eq: Equipment) => {
+    setHoveredName(eq.name);
+    const images = await fetchEqImages(eq);
+    startCycle(images);
+  }, [fetchEqImages, startCycle]);
 
   const onDropFloorplan = useCallback(async (files: File[]) => {
     const file = files[0];
@@ -237,7 +298,40 @@ export function KitchenClient({
       .catch(() => setAnnotations([]));
   }, [selectedFloorplan]);
 
+  const hasImage = slots.a !== null || slots.b !== null;
+
   return (
+    <>
+      {/* Full-height left image panel */}
+      <div
+        aria-hidden
+        className="fixed inset-y-0 left-0 pointer-events-none overflow-hidden"
+        style={{ width: 'calc(100vw - 80rem)' }}
+      >
+        {slots.a && (
+          <img
+            src={slots.a}
+            alt=""
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'a' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        {slots.b && (
+          <img
+            src={slots.b}
+            alt=""
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'b' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        {hasImage && (
+          <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-r from-transparent to-background" />
+        )}
+        {hasImage && hoveredName && (
+          <div className="absolute bottom-0 inset-x-0 px-3 py-4 bg-gradient-to-t from-black/70 to-transparent">
+            <p className="text-white text-xs font-medium leading-tight line-clamp-2">{hoveredName}</p>
+          </div>
+        )}
+      </div>
+
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -282,7 +376,7 @@ export function KitchenClient({
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {equipment.map((eq) => (
-              <Card key={eq.id}>
+              <Card key={eq.id} className="cursor-default transition-shadow hover:shadow-md" onMouseEnter={() => handleEqHover(eq)}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div>
@@ -410,5 +504,6 @@ export function KitchenClient({
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }
