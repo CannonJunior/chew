@@ -39,7 +39,6 @@ Example output:
         prompt,
         images: [base64],
         stream: false,
-        format: 'json',
       }),
     });
 
