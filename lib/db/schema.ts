@@ -21,9 +21,13 @@ export const groceryItems = sqliteTable('grocery_items', {
   category: text('category').default('other'),
   quantity: real('quantity'),
   unit: text('unit'),
+  price: real('price'),
   purchaseDate: integer('purchase_date'),
   expiryDate: integer('expiry_date'),
   runningLow: integer('running_low').default(0),
+  remainingPct: real('remaining_pct').default(100),
+  removedAt: integer('removed_at'),
+  removalReason: text('removal_reason'), // 'consumed' | 'disposed'
   notes: text('notes'),
   wikiId: text('wiki_id'),
   createdAt: integer('created_at').notNull(),

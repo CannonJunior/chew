@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Search, Network, Leaf } from 'lucide-react';
+import { Plus, Search, Network, Leaf, GitCompare, X, CheckSquare } from 'lucide-react';
 
 // Cytoscape requires the DOM, so load it dynamically
 const CytoscapeComponent = dynamic(() => import('react-cytoscapejs'), { ssr: false });
@@ -18,12 +18,14 @@ const CytoscapeComponent = dynamic(() => import('react-cytoscapejs'), { ssr: fal
 type Ingredient = {
   id: string;
   name: string;
+  aliases: string | null;
   description: string | null;
   category: string | null;
   subcategory: string | null;
   origin: string | null;
   flavorProfile: string | null;
   seasons: string | null;
+  imageUrl: string | null;
   createdAt: number;
 };
 
@@ -108,6 +110,8 @@ function FlavorGraph({ ingredientId, ingredientName, relationships, relatedIngre
   );
 }
 
+type CompareData = DetailData & { id: string };
+
 export function WikiClient({ initialIngredients }: { initialIngredients: Ingredient[] }) {
   const [ingredients, setIngredients] = useState(initialIngredients);
   const [search, setSearch] = useState('');
@@ -115,8 +119,12 @@ export function WikiClient({ initialIngredients }: { initialIngredients: Ingredi
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailData | null>(null);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', category: '', origin: '' });
+  const [form, setForm] = useState({ name: '', aliases: '', description: '', category: '', subcategory: '', origin: '', seasons: '', imageUrl: '' });
   const [saving, setSaving] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [compareData, setCompareData] = useState<CompareData[] | null>(null);
+  const [loadingCompare, setLoadingCompare] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -135,6 +143,41 @@ export function WikiClient({ initialIngredients }: { initialIngredients: Ingredi
     }, 300);
   }, [initialIngredients]);
 
+  function toggleCompareId(id: string) {
+    setCompareIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 4 ? [...prev, id] : prev
+    );
+  }
+
+  async function runCompare() {
+    if (compareIds.length < 2) { toast.error('Select at least 2 ingredients to compare'); return; }
+    setLoadingCompare(true);
+    try {
+      const results = await Promise.all(
+        compareIds.map(async (id) => {
+          const [detailRes, relRes] = await Promise.all([
+            fetch(`/api/wiki/ingredients/${id}`),
+            fetch(`/api/wiki/relationships?ingredientId=${id}`),
+          ]);
+          const { ingredient, nutrition } = await detailRes.json();
+          const { relationships, ingredients: relatedIngredients } = await relRes.json();
+          return { id, ingredient, nutrition, relationships, relatedIngredients } as CompareData;
+        })
+      );
+      setCompareData(results);
+    } catch {
+      toast.error('Failed to load comparison data');
+    } finally {
+      setLoadingCompare(false);
+    }
+  }
+
+  function exitCompareMode() {
+    setCompareMode(false);
+    setCompareIds([]);
+    setCompareData(null);
+  }
+
   async function openDetail(id: string) {
     setSelected(id);
     const [detailRes, relRes] = await Promise.all([
@@ -150,15 +193,26 @@ export function WikiClient({ initialIngredients }: { initialIngredients: Ingredi
     if (!form.name.trim()) return;
     setSaving(true);
     try {
+      const aliasArr = form.aliases.trim() ? form.aliases.split(',').map((s) => s.trim()).filter(Boolean) : null;
+      const seasonArr = form.seasons.trim() ? form.seasons.split(',').map((s) => s.trim()).filter(Boolean) : null;
       const res = await fetch('/api/wiki/ingredients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: form.name, description: form.description || null, category: form.category || null, origin: form.origin || null }),
+        body: JSON.stringify({
+          name: form.name,
+          aliases: aliasArr,
+          description: form.description || null,
+          category: form.category || null,
+          subcategory: form.subcategory || null,
+          origin: form.origin || null,
+          seasons: seasonArr,
+          imageUrl: form.imageUrl || null,
+        }),
       });
       const ingredient = await res.json();
       setIngredients((prev) => [ingredient, ...prev]);
       setShowAdd(false);
-      setForm({ name: '', description: '', category: '', origin: '' });
+      setForm({ name: '', aliases: '', description: '', category: '', subcategory: '', origin: '', seasons: '', imageUrl: '' });
       toast.success('Ingredient added');
     } catch {
       toast.error('Failed to add ingredient');
@@ -176,11 +230,39 @@ export function WikiClient({ initialIngredients }: { initialIngredients: Ingredi
           <h1 className="text-2xl font-bold">Food Wiki</h1>
           <p className="text-muted-foreground text-sm">{ingredients.length} ingredients</p>
         </div>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Ingredient
-        </Button>
+        <div className="flex gap-2">
+          {compareMode ? (
+            <>
+              <Button variant="outline" onClick={exitCompareMode}>
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={runCompare} disabled={compareIds.length < 2 || loadingCompare}>
+                <GitCompare className="w-4 h-4 mr-2" />
+                {loadingCompare ? 'Loading...' : `Compare${compareIds.length > 0 ? ` (${compareIds.length})` : ''}`}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => setCompareMode(true)}>
+                <GitCompare className="w-4 h-4 mr-2" />
+                Compare
+              </Button>
+              <Button onClick={() => setShowAdd(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Ingredient
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+      {compareMode && (
+        <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-4 py-2 text-sm text-primary">
+          {compareIds.length === 0
+            ? 'Click ingredients to select them for comparison (up to 4)'
+            : `${compareIds.length} selected — ${compareIds.length < 2 ? 'select at least one more' : 'ready to compare'}`}
+        </div>
+      )}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -201,19 +283,33 @@ export function WikiClient({ initialIngredients }: { initialIngredients: Ingredi
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {ingredients.map((ing) => (
-            <Card
-              key={ing.id}
-              className={`cursor-pointer transition-shadow hover:shadow-md ${selected === ing.id ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => openDetail(ing.id)}
-            >
-              <CardContent className="p-4">
-                <p className="font-medium text-sm leading-tight">{ing.name}</p>
-                {ing.category && <p className="text-xs text-muted-foreground mt-1">{ing.category}</p>}
-                {ing.origin && <p className="text-xs text-muted-foreground">{ing.origin}</p>}
-              </CardContent>
-            </Card>
-          ))}
+          {ingredients.map((ing) => {
+            const isCompareSelected = compareIds.includes(ing.id);
+            return (
+              <Card
+                key={ing.id}
+                className={`cursor-pointer transition-shadow hover:shadow-md ${
+                  compareMode
+                    ? isCompareSelected
+                      ? 'ring-2 ring-primary bg-primary/5'
+                      : 'opacity-70'
+                    : selected === ing.id
+                    ? 'ring-2 ring-primary'
+                    : ''
+                }`}
+                onClick={() => compareMode ? toggleCompareId(ing.id) : openDetail(ing.id)}
+              >
+                <CardContent className="p-4 relative">
+                  {compareMode && isCompareSelected && (
+                    <CheckSquare className="absolute top-2 right-2 w-4 h-4 text-primary" />
+                  )}
+                  <p className="font-medium text-sm leading-tight">{ing.name}</p>
+                  {ing.category && <p className="text-xs text-muted-foreground mt-1">{ing.category}</p>}
+                  {ing.origin && <p className="text-xs text-muted-foreground">{ing.origin}</p>}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -223,13 +319,34 @@ export function WikiClient({ initialIngredients }: { initialIngredients: Ingredi
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{detail.ingredient.name}</DialogTitle>
-              <div className="flex gap-2 mt-1">
+              <div className="flex gap-2 mt-1 flex-wrap">
                 {detail.ingredient.category && <Badge variant="outline">{detail.ingredient.category}</Badge>}
+                {detail.ingredient.subcategory && <Badge variant="outline">{detail.ingredient.subcategory}</Badge>}
                 {detail.ingredient.origin && <Badge variant="outline">{detail.ingredient.origin}</Badge>}
               </div>
             </DialogHeader>
             <div className="space-y-5">
-              {detail.ingredient.description && <p className="text-sm">{detail.ingredient.description}</p>}
+              {detail.ingredient.imageUrl && (
+                <img
+                  src={detail.ingredient.imageUrl}
+                  alt={detail.ingredient.name}
+                  className="w-full h-48 object-cover rounded-lg"
+                />
+              )}
+
+              {detail.ingredient.description && <p className="text-sm leading-relaxed">{detail.ingredient.description}</p>}
+
+              {detail.ingredient.aliases && (() => {
+                const aliases = parseJson(detail.ingredient.aliases) as string[] | null;
+                return aliases?.length ? (
+                  <div>
+                    <h3 className="font-semibold text-sm mb-2">Also Known As</h3>
+                    <div className="flex gap-2 flex-wrap">
+                      {aliases.map((a) => <Badge key={a} variant="secondary">{a}</Badge>)}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
 
               {detail.ingredient.flavorProfile && (() => {
                 const fp = parseJson(detail.ingredient.flavorProfile);
@@ -288,6 +405,149 @@ export function WikiClient({ initialIngredients }: { initialIngredients: Ingredi
         </Dialog>
       )}
 
+      {/* Compare Dialog */}
+      <Dialog open={!!compareData} onOpenChange={(open) => { if (!open) setCompareData(null); }}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitCompare className="w-5 h-5" /> Compare Ingredients
+            </DialogTitle>
+          </DialogHeader>
+          {compareData && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left py-2 pr-4 text-muted-foreground font-medium w-32">Field</th>
+                    {compareData.map((d) => (
+                      <th key={d.id} className="text-left py-2 px-3 font-semibold border-l">
+                        {d.ingredient.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  <tr className="bg-muted/30">
+                    <td className="py-2 pr-4 text-muted-foreground text-xs font-medium uppercase tracking-wide" colSpan={compareData.length + 1}>
+                      General
+                    </td>
+                  </tr>
+                  {(['category', 'subcategory', 'origin'] as const).map((field) => (
+                    <tr key={field} className="hover:bg-muted/20">
+                      <td className="py-2 pr-4 text-muted-foreground capitalize">{field}</td>
+                      {compareData.map((d) => (
+                        <td key={d.id} className="py-2 px-3 border-l">
+                          {d.ingredient[field] ?? <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr className="hover:bg-muted/20">
+                    <td className="py-2 pr-4 text-muted-foreground">Aliases</td>
+                    {compareData.map((d) => {
+                      const a = parseJson(d.ingredient.aliases) as string[] | null;
+                      return (
+                        <td key={d.id} className="py-2 px-3 border-l">
+                          {a?.length ? (
+                            <div className="flex gap-1 flex-wrap">{a.map((x) => <Badge key={x} variant="secondary" className="text-xs">{x}</Badge>)}</div>
+                          ) : <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  <tr className="hover:bg-muted/20">
+                    <td className="py-2 pr-4 text-muted-foreground">Seasons</td>
+                    {compareData.map((d) => {
+                      const s = parseJson(d.ingredient.seasons) as string[] | null;
+                      return (
+                        <td key={d.id} className="py-2 px-3 border-l">
+                          {s?.length ? (
+                            <div className="flex gap-1 flex-wrap">{s.map((x) => <Badge key={x} variant="outline" className="text-xs">{x}</Badge>)}</div>
+                          ) : <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                  <tr className="hover:bg-muted/20">
+                    <td className="py-2 pr-4 text-muted-foreground align-top">Description</td>
+                    {compareData.map((d) => (
+                      <td key={d.id} className="py-2 px-3 border-l align-top text-xs leading-relaxed max-w-xs">
+                        {d.ingredient.description ?? <span className="text-muted-foreground/50">—</span>}
+                      </td>
+                    ))}
+                  </tr>
+
+                  <tr className="bg-muted/30">
+                    <td className="py-2 pr-4 text-muted-foreground text-xs font-medium uppercase tracking-wide" colSpan={compareData.length + 1}>
+                      Flavor Profile
+                    </td>
+                  </tr>
+                  <tr className="hover:bg-muted/20">
+                    <td className="py-2 pr-4 text-muted-foreground align-top">Notes</td>
+                    {compareData.map((d) => {
+                      const fp = parseJson(d.ingredient.flavorProfile) as Record<string, number> | null;
+                      return (
+                        <td key={d.id} className="py-2 px-3 border-l align-top">
+                          {fp ? (
+                            <div className="flex gap-1 flex-wrap">
+                              {Object.entries(fp).map(([k, v]) => (
+                                <Badge key={k} variant="secondary" className="text-xs">{k}: {v}</Badge>
+                              ))}
+                            </div>
+                          ) : <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+
+                  <tr className="bg-muted/30">
+                    <td className="py-2 pr-4 text-muted-foreground text-xs font-medium uppercase tracking-wide" colSpan={compareData.length + 1}>
+                      Nutrition (per 100g)
+                    </td>
+                  </tr>
+                  {([
+                    { key: 'calories', label: 'Calories', unit: ' kcal' },
+                    { key: 'proteinG', label: 'Protein', unit: 'g' },
+                    { key: 'carbsG', label: 'Carbs', unit: 'g' },
+                    { key: 'fatG', label: 'Fat', unit: 'g' },
+                    { key: 'fiberG', label: 'Fiber', unit: 'g' },
+                  ] as const).map(({ key, label, unit }) => {
+                    const values = compareData.map((d) => d.nutrition?.[key] ?? null);
+                    const max = Math.max(...values.filter((v): v is number => v != null), 1);
+                    return (
+                      <tr key={key} className="hover:bg-muted/20">
+                        <td className="py-2 pr-4 text-muted-foreground">{label}</td>
+                        {compareData.map((d, i) => {
+                          const val = values[i];
+                          return (
+                            <td key={d.id} className="py-2 px-3 border-l">
+                              {val != null ? (
+                                <div className="space-y-1">
+                                  <span className="font-medium">{val}{unit}</span>
+                                  <div className="h-1.5 bg-muted rounded-full w-28">
+                                    <div
+                                      className="h-1.5 bg-primary rounded-full"
+                                      style={{ width: `${Math.min((val / max) * 100, 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ) : <span className="text-muted-foreground/50">—</span>}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompareData(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Ingredient Dialog */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent>
@@ -297,19 +557,37 @@ export function WikiClient({ initialIngredients }: { initialIngredients: Ingredi
               <Label>Name *</Label>
               <Input value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Saffron" />
             </div>
+            <div>
+              <Label>Also Known As <span className="text-muted-foreground font-normal">(comma-separated)</span></Label>
+              <Input value={form.aliases} onChange={(e) => setForm((p) => ({ ...p, aliases: e.target.value }))} placeholder="Crocus sativus, Zafaran" />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Category</Label>
                 <Input value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))} placeholder="Spice" />
               </div>
               <div>
+                <Label>Subcategory</Label>
+                <Input value={form.subcategory} onChange={(e) => setForm((p) => ({ ...p, subcategory: e.target.value }))} placeholder="Floral spice" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
                 <Label>Origin</Label>
                 <Input value={form.origin} onChange={(e) => setForm((p) => ({ ...p, origin: e.target.value }))} placeholder="Iran" />
+              </div>
+              <div>
+                <Label>Seasons <span className="text-muted-foreground font-normal">(comma-separated)</span></Label>
+                <Input value={form.seasons} onChange={(e) => setForm((p) => ({ ...p, seasons: e.target.value }))} placeholder="Fall, Winter" />
               </div>
             </div>
             <div>
               <Label>Description</Label>
-              <Textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} rows={3} />
+              <Textarea value={form.description} onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))} rows={3} placeholder="Rich, aromatic threads with earthy, honey-like sweetness..." />
+            </div>
+            <div>
+              <Label>Image URL</Label>
+              <Input value={form.imageUrl} onChange={(e) => setForm((p) => ({ ...p, imageUrl: e.target.value }))} placeholder="https://..." />
             </div>
           </div>
           <DialogFooter>

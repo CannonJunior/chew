@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,9 +44,6 @@ const CATEGORY_ICONS: Record<string, string> = {
   other:     '✦',
 };
 
-// Two-slot crossfade state
-type Slots = { a: string | null; b: string | null; active: 'a' | 'b' };
-
 function formatPrice(p: number | null) {
   if (p == null) return null;
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(p);
@@ -67,62 +64,7 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
   });
 
   // Image preview state
-  const [slots, setSlots] = useState<Slots>({ a: null, b: null, active: 'a' });
-  const [hoveredName, setHoveredName] = useState<string | null>(null);
-  const imageCacheRef = useRef<Map<string, string[]>>(new Map());
-  const fetchPromisesRef = useRef<Map<string, Promise<string[]>>>(new Map());
-  const cycleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cycleIndexRef = useRef(0);
-
-  useEffect(() => () => { if (cycleTimerRef.current) clearInterval(cycleTimerRef.current); }, []);
-
-  const showImage = useCallback((url: string) => {
-    setSlots((prev) => {
-      const next = prev.active === 'a' ? 'b' : 'a';
-      return { ...prev, [next]: url, active: next };
-    });
-  }, []);
-
-  const startCycle = useCallback((images: string[]) => {
-    if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
-    if (!images.length) return;
-    cycleIndexRef.current = 0;
-    showImage(images[0]);
-    if (images.length === 1) return;
-    cycleTimerRef.current = setInterval(() => {
-      cycleIndexRef.current = (cycleIndexRef.current + 1) % images.length;
-      showImage(images[cycleIndexRef.current]);
-    }, 5000);
-  }, [showImage]);
-
-  const fetchItemImages = useCallback(async (item: WishlistItem): Promise<string[]> => {
-    const cached = imageCacheRef.current.get(item.id);
-    if (cached !== undefined) return cached;
-    const existing = fetchPromisesRef.current.get(item.id);
-    if (existing) return existing;
-    const query = [item.brand, item.name].filter(Boolean).join(' ');
-    const promise = (async () => {
-      try {
-        const res = await fetch(`/api/kitchen/image?q=${encodeURIComponent(query)}`);
-        const { images } = await res.json() as { images: string[] };
-        imageCacheRef.current.set(item.id, images);
-        return images;
-      } catch {
-        imageCacheRef.current.set(item.id, []);
-        return [] as string[];
-      } finally {
-        fetchPromisesRef.current.delete(item.id);
-      }
-    })();
-    fetchPromisesRef.current.set(item.id, promise);
-    return promise;
-  }, []);
-
-  const handleItemHover = useCallback(async (item: WishlistItem) => {
-    setHoveredName(item.name);
-    const images = await fetchItemImages(item);
-    startCycle(images);
-  }, [fetchItemImages, startCycle]);
+  const [hoveredItem, setHoveredItem] = useState<WishlistItem | null>(null);
 
   const activeItems = items.filter((it) => {
     if (hideAcquired && it.acquired) return false;
@@ -199,7 +141,7 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
   }
 
   const usedCategories = [...new Set(items.map((i) => i.category).filter(Boolean))] as string[];
-  const hasImage = slots.a !== null || slots.b !== null;
+  const panelImage = hoveredItem?.imageUrl ?? null;
 
   return (
     <>
@@ -209,31 +151,24 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
         className="fixed inset-y-0 left-0 pointer-events-none overflow-hidden"
         style={{ width: 'calc(100vw - 80rem)' }}
       >
-        {slots.a && (
+        {panelImage && (
           <img
-            src={slots.a}
+            src={panelImage}
             alt=""
-            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'a' ? 'opacity-100' : 'opacity-0'}`}
+            className="absolute inset-0 w-full h-full object-cover object-center"
           />
         )}
-        {slots.b && (
-          <img
-            src={slots.b}
-            alt=""
-            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'b' ? 'opacity-100' : 'opacity-0'}`}
-          />
-        )}
-        {hasImage && (
+        {panelImage && (
           <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-r from-transparent to-background" />
         )}
-        {hasImage && hoveredName && (
+        {panelImage && hoveredItem && (
           <div className="absolute bottom-0 inset-x-0 px-3 py-4 bg-gradient-to-t from-black/70 to-transparent">
-            <p className="text-white text-xs font-medium leading-tight line-clamp-2">{hoveredName}</p>
+            <p className="text-white text-xs font-medium leading-tight line-clamp-2">{hoveredItem.name}</p>
           </div>
         )}
       </div>
 
-    <div className="space-y-5">
+    <div className="space-y-5" style={{ marginLeft: 'max(0px, calc((100vw - 80rem) / 2))' }}>
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -325,7 +260,7 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
               <div
                 key={item.id}
                 className={`rounded-xl border p-4 flex flex-col gap-3 transition-opacity ${isAcquired ? 'opacity-50' : 'hover:shadow-sm'}`}
-                onMouseEnter={() => handleItemHover(item)}
+                onMouseEnter={() => setHoveredItem(item)}
               >
                 {/* Top row */}
                 <div className="flex items-start justify-between gap-2">

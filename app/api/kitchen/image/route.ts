@@ -79,6 +79,10 @@ async function searchWikipedia(query: string): Promise<string[]> {
 function searchVariants(query: string): string[] {
   const terms: string[] = [query];
   const words = query.split(/\s+/);
+  // First word alone (brand name — often a direct Wikipedia slug, e.g. "Le_Creuset", "KitchenAid")
+  if (words.length > 1) terms.push(words[0]);
+  // First two words (brand + model, e.g. "Instant Pot", "Le Creuset")
+  if (words.length > 2) terms.push(words.slice(0, 2).join(' '));
   // Last 3 words (often the core item type e.g. "Carbon Steel Pan")
   if (words.length > 3) terms.push(words.slice(-3).join(' '));
   // Last 2 words
