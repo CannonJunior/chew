@@ -277,45 +277,8 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
   }
 
   const totalTime = (r: Recipe) => (r.prepTimeMin ?? 0) + (r.cookTimeMin ?? 0);
-  const hasImage = slots.a !== null || slots.b !== null;
-
   return (
-    <>
-      {/* Full-height left image panel — doubled width, sits left of the recipe list */}
-      <div
-        aria-hidden
-        className="fixed inset-y-0 left-0 pointer-events-none overflow-hidden"
-        style={{ width: 'calc(100vw - 80rem)' }}
-      >
-        {/* Images fill the entire panel, cropped/zoomed via object-cover */}
-        {slots.a && (
-          <img
-            src={slots.a}
-            alt=""
-            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'a' ? 'opacity-100' : 'opacity-0'}`}
-          />
-        )}
-        {slots.b && (
-          <img
-            src={slots.b}
-            alt=""
-            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'b' ? 'opacity-100' : 'opacity-0'}`}
-          />
-        )}
-        {/* Right-edge fade so image blends into page background */}
-        {hasImage && (
-          <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-r from-transparent to-background" />
-        )}
-        {/* Recipe name caption at bottom */}
-        {hasImage && hoveredTitle && (
-          <div className="absolute bottom-0 inset-x-0 px-3 py-4 bg-gradient-to-t from-black/70 to-transparent">
-            <p className="text-white text-xs font-medium leading-tight line-clamp-2">{hoveredTitle}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Main content — shifted right so it clears the doubled image panel */}
-      <div className="space-y-6" style={{ marginLeft: 'max(0px, calc((100vw - 80rem) / 2))' }}>
+    <div className="space-y-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Recipes</h1>
@@ -567,6 +530,5 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
           </DialogContent>
         </Dialog>
       </div>
-    </>
   );
 }

@@ -141,34 +141,8 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
   }
 
   const usedCategories = [...new Set(items.map((i) => i.category).filter(Boolean))] as string[];
-  const panelImage = hoveredItem?.imageUrl ?? null;
-
   return (
-    <>
-      {/* Full-height left image panel */}
-      <div
-        aria-hidden
-        className="fixed inset-y-0 left-0 pointer-events-none overflow-hidden"
-        style={{ width: 'calc(100vw - 80rem)' }}
-      >
-        {panelImage && (
-          <img
-            src={panelImage}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover object-center"
-          />
-        )}
-        {panelImage && (
-          <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-r from-transparent to-background" />
-        )}
-        {panelImage && hoveredItem && (
-          <div className="absolute bottom-0 inset-x-0 px-3 py-4 bg-gradient-to-t from-black/70 to-transparent">
-            <p className="text-white text-xs font-medium leading-tight line-clamp-2">{hoveredItem.name}</p>
-          </div>
-        )}
-      </div>
-
-    <div className="space-y-5" style={{ marginLeft: 'max(0px, calc((100vw - 80rem) / 2))' }}>
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -437,6 +411,5 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
         </DialogContent>
       </Dialog>
     </div>
-    </>
   );
 }

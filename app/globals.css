@@ -125,6 +125,6 @@
   }
   html {
     @apply font-sans;
-    font-size: 200%;
+    font-size: 100%;
   }
 }
