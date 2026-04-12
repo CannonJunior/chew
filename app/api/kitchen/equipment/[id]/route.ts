@@ -6,9 +6,9 @@ import { eq } from 'drizzle-orm';
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
-  const { name, brand, model, category, subcategory, condition, notes, imagePath, purchasedDate } = body;
+  const { name, brand, model, category, subcategory, condition, notes, imagePath, productUrl, purchasedDate } = body;
   const update = Object.fromEntries(
-    Object.entries({ name, brand, model, category, subcategory, condition, notes, imagePath, purchasedDate })
+    Object.entries({ name, brand, model, category, subcategory, condition, notes, imagePath, productUrl, purchasedDate })
       .filter(([, v]) => v !== undefined)
   );
   db.update(kitchenEquipment).set(update).where(eq(kitchenEquipment.id, id)).run();

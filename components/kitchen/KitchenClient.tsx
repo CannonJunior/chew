@@ -29,6 +29,7 @@ type Equipment = {
   category: string | null;
   condition: string | null;
   notes: string | null;
+  productUrl: string | null;
   createdAt: number;
 };
 
@@ -306,7 +307,7 @@ export function KitchenClient({
       <div
         aria-hidden
         className="fixed inset-y-0 left-0 pointer-events-none overflow-hidden"
-        style={{ width: 'calc(100vw - 80rem)' }}
+        style={{ width: 'calc((100vw - 80rem) / 2)' }}
       >
         {slots.a && (
           <img
@@ -396,6 +397,11 @@ export function KitchenClient({
                     )}
                   </div>
                   {eq.notes && <p className="text-xs text-muted-foreground mt-2">{eq.notes}</p>}
+                  {eq.productUrl && (
+                    <a href={eq.productUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 block truncate">
+                      Find online
+                    </a>
+                  )}
                 </CardContent>
               </Card>
             ))}

@@ -420,7 +420,7 @@ export function PantryClient({ initialItems }: { initialItems: GroceryItem[] }) 
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {filtered.map((item) => (
-            <Card key={item.id} className={`relative ${item.runningLow === 1 ? 'ring-1 ring-amber-400' : ''}`}>
+            <Card key={item.id} className={`relative card-elevated ${item.runningLow === 1 ? 'ring-1 ring-amber-400' : ''}`}>
               <CardContent className="pt-4 pb-3 px-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">

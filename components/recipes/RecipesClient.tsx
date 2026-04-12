@@ -40,6 +40,9 @@ type Slots = { a: string | null; b: string | null; active: 'a' | 'b' };
 export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) {
   const [recipes, setRecipes] = useState(initialRecipes);
   const [search, setSearch] = useState('');
+  const [filterCuisine, setFilterCuisine] = useState('all');
+  const [filterDifficulty, setFilterDifficulty] = useState('all');
+  const [likedOnly, setLikedOnly] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<{ recipe: Recipe; ingredients: Ingredient[]; steps: Step[] } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -60,12 +63,10 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
   const [slots, setSlots] = useState<Slots>({ a: null, b: null, active: 'a' });
   const [hoveredTitle, setHoveredTitle] = useState<string | null>(null);
 
-  // Per-recipe image arrays, keyed by recipe id
-  const imageCacheRef = useRef<Map<string, string[]>>(new Map());
-  // In-flight fetch promises — lets hover await an ongoing prefetch instead of dropping it
-  const fetchPromisesRef = useRef<Map<string, Promise<string[]>>>(new Map());
-  const cycleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cycleIndexRef = useRef(0);
+  // Per-recipe image cache, keyed by recipe id
+  const imageCacheRef = useRef<Map<string, string | null>>(new Map());
+  // In-flight fetch promises
+  const fetchPromisesRef = useRef<Map<string, Promise<string | null>>>(new Map());
 
   // Push a new image into the inactive slot and flip active
   const showImage = useCallback((url: string) => {
@@ -75,24 +76,8 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
     });
   }, []);
 
-  // Start (or restart) cycling through an array of images
-  const startCycle = useCallback((images: string[]) => {
-    if (cycleTimerRef.current) clearInterval(cycleTimerRef.current);
-    if (!images.length) return;
-    cycleIndexRef.current = 0;
-    showImage(images[0]);
-    if (images.length === 1) return;
-    cycleTimerRef.current = setInterval(() => {
-      cycleIndexRef.current = (cycleIndexRef.current + 1) % images.length;
-      showImage(images[cycleIndexRef.current]);
-    }, 5000);
-  }, [showImage]);
-
-  // Clean up cycle timer on unmount
-  useEffect(() => () => { if (cycleTimerRef.current) clearInterval(cycleTimerRef.current); }, []);
-
-  // Fetch and cache images for a recipe; deduplicates concurrent calls via promise sharing
-  const fetchImages = useCallback(async (recipe: Recipe): Promise<string[]> => {
+  // Fetch and cache the single image for a recipe
+  const fetchImage = useCallback(async (recipe: Recipe): Promise<string | null> => {
     const cached = imageCacheRef.current.get(recipe.id);
     if (cached !== undefined) return cached;
     const existing = fetchPromisesRef.current.get(recipe.id);
@@ -101,11 +86,12 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
       try {
         const res = await fetch(`/api/recipes/image?id=${recipe.id}&q=${encodeURIComponent(recipe.title)}`);
         const { images } = await res.json() as { images: string[] };
-        imageCacheRef.current.set(recipe.id, images);
-        return images;
+        const url = images[0] ?? null;
+        imageCacheRef.current.set(recipe.id, url);
+        return url;
       } catch {
-        imageCacheRef.current.set(recipe.id, []);
-        return [] as string[];
+        imageCacheRef.current.set(recipe.id, null);
+        return null;
       } finally {
         fetchPromisesRef.current.delete(recipe.id);
       }
@@ -121,7 +107,7 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
       const BATCH = 4;
       for (let i = 0; i < recipes.length; i += BATCH) {
         if (cancelled) break;
-        await Promise.all(recipes.slice(i, i + BATCH).map((r) => fetchImages(r)));
+        await Promise.all(recipes.slice(i, i + BATCH).map((r) => fetchImage(r)));
       }
     })();
     return () => { cancelled = true; };
@@ -130,9 +116,9 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
 
   const handleRecipeHover = useCallback(async (recipe: Recipe) => {
     setHoveredTitle(recipe.title);
-    const images = await fetchImages(recipe);
-    startCycle(images);
-  }, [fetchImages, startCycle]);
+    const url = await fetchImage(recipe);
+    if (url) showImage(url);
+  }, [fetchImage, showImage]);
 
   function toggleVote(id: string, direction: 'up' | 'down', e: React.MouseEvent) {
     e.stopPropagation();
@@ -191,7 +177,7 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
         imageCacheRef.current.delete(id);
         fetchPromisesRef.current.delete(id);
       }
-      for (const r of added) fetchImages(r);
+      for (const r of added) fetchImage(r);
 
       // Mark new recipes with the sparkle indicator
       setNewImageRecipes(new Set(added.map((r) => r.id)));
@@ -204,12 +190,21 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
     }
   }
 
+  const usedCuisines = useMemo(
+    () => [...new Set(recipes.map((r) => r.cuisine).filter(Boolean))].sort() as string[],
+    [recipes],
+  );
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return recipes.filter((r) =>
-      r.title.toLowerCase().includes(q) || (r.cuisine ?? '').toLowerCase().includes(q)
-    );
-  }, [recipes, search]);
+    return recipes.filter((r) => {
+      if (q && !r.title.toLowerCase().includes(q) && !(r.cuisine ?? '').toLowerCase().includes(q)) return false;
+      if (filterCuisine !== 'all' && r.cuisine !== filterCuisine) return false;
+      if (filterDifficulty !== 'all' && r.difficulty !== filterDifficulty) return false;
+      if (likedOnly && votes[r.id] !== 'up') return false;
+      return true;
+    });
+  }, [recipes, search, filterCuisine, filterDifficulty, likedOnly, votes]);
 
   async function openDetail(id: string) {
     setSelected(id);
@@ -277,7 +272,38 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
   }
 
   const totalTime = (r: Recipe) => (r.prepTimeMin ?? 0) + (r.cookTimeMin ?? 0);
+  const hasImage = slots.a !== null || slots.b !== null;
   return (
+    <>
+      {/* Full-height left image panel */}
+      <div
+        aria-hidden
+        className="fixed inset-y-0 left-0 pointer-events-none overflow-hidden"
+        style={{ width: 'calc((100vw - 80rem) / 2)' }}
+      >
+        {slots.a && (
+          <img
+            src={slots.a}
+            alt=""
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'a' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        {slots.b && (
+          <img
+            src={slots.b}
+            alt=""
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'b' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        {hasImage && (
+          <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-r from-transparent to-background" />
+        )}
+        {hasImage && hoveredTitle && (
+          <div className="absolute bottom-0 inset-x-0 px-3 py-4 bg-gradient-to-t from-black/70 to-transparent">
+            <p className="text-white text-xs font-medium leading-tight line-clamp-2">{hoveredTitle}</p>
+          </div>
+        )}
+      </div>
     <div className="space-y-6">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -306,6 +332,56 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
           />
         </div>
 
+        {/* Filter bar */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Cuisine pills */}
+          {usedCuisines.length > 0 && (
+            <div className="flex gap-1 flex-wrap">
+              <button
+                onClick={() => setFilterCuisine('all')}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${filterCuisine === 'all' ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+              >
+                All cuisines
+              </button>
+              {usedCuisines.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setFilterCuisine(filterCuisine === c ? 'all' : c)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${filterCuisine === c ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {usedCuisines.length > 0 && <div className="w-px h-5 bg-border mx-1 hidden sm:block" />}
+
+          {/* Difficulty pills */}
+          <div className="flex gap-1">
+            {(['all', 'easy', 'medium', 'hard'] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setFilterDifficulty(filterDifficulty === d ? 'all' : d)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors border ${
+                  filterDifficulty === d
+                    ? d === 'all' ? 'bg-foreground text-background border-foreground' : `${DIFFICULTY_COLORS[d]} border-current`
+                    : 'bg-transparent border-border text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {d === 'all' ? 'Any difficulty' : d.charAt(0).toUpperCase() + d.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setLikedOnly(!likedOnly)}
+            className={`ml-auto px-3 py-1 rounded-full text-xs font-medium transition-colors border ${likedOnly ? 'bg-foreground text-background border-foreground' : 'border-border text-muted-foreground hover:text-foreground'}`}
+          >
+            {likedOnly ? 'Liked only' : 'Show all'}
+          </button>
+        </div>
+
         {filtered.length === 0 ? (
           <div className="rounded-lg border border-dashed p-12 text-center text-muted-foreground">
             <ChefHat className="w-12 h-12 mx-auto mb-3 opacity-40" />
@@ -317,7 +393,7 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
             {filtered.map((r) => (
               <Card
                 key={r.id}
-                className={`cursor-pointer transition-shadow hover:shadow-md ${selected === r.id ? 'ring-2 ring-primary' : ''}`}
+                className={`cursor-pointer card-elevated ${selected === r.id ? 'ring-2 ring-primary' : ''}`}
                 onClick={() => openDetail(r.id)}
                 onMouseEnter={() => handleRecipeHover(r)}
               >
@@ -530,5 +606,6 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
           </DialogContent>
         </Dialog>
       </div>
+    </>
   );
 }

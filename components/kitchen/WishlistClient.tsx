@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +51,9 @@ function formatPrice(p: number | null) {
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
+// Two-slot crossfade state
+type Slots = { a: string | null; b: string | null; active: 'a' | 'b' };
+
 export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] }) {
   const [items, setItems] = useState<WishlistItem[]>(initialItems);
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -65,6 +68,46 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
 
   // Image preview state
   const [hoveredItem, setHoveredItem] = useState<WishlistItem | null>(null);
+  const [slots, setSlots] = useState<Slots>({ a: null, b: null, active: 'a' });
+  const imageCacheRef = useRef<Map<string, string | null>>(new Map());
+  const fetchPromisesRef = useRef<Map<string, Promise<string | null>>>(new Map());
+
+  const showImage = useCallback((url: string) => {
+    setSlots((prev) => {
+      const next = prev.active === 'a' ? 'b' : 'a';
+      return { ...prev, [next]: url, active: next };
+    });
+  }, []);
+
+  const fetchWishImage = useCallback(async (item: WishlistItem): Promise<string | null> => {
+    const cached = imageCacheRef.current.get(item.id);
+    if (cached !== undefined) return cached;
+    const existing = fetchPromisesRef.current.get(item.id);
+    if (existing) return existing;
+    const query = [item.brand, item.name].filter(Boolean).join(' ');
+    const promise = (async () => {
+      try {
+        const res = await fetch(`/api/kitchen/image?q=${encodeURIComponent(query)}`);
+        const { images } = await res.json() as { images: string[] };
+        const url = images[0] ?? null;
+        imageCacheRef.current.set(item.id, url);
+        return url;
+      } catch {
+        imageCacheRef.current.set(item.id, null);
+        return null;
+      } finally {
+        fetchPromisesRef.current.delete(item.id);
+      }
+    })();
+    fetchPromisesRef.current.set(item.id, promise);
+    return promise;
+  }, []);
+
+  const handleItemHover = useCallback(async (item: WishlistItem) => {
+    setHoveredItem(item);
+    const url = await fetchWishImage(item);
+    if (url) showImage(url);
+  }, [fetchWishImage, showImage]);
 
   const activeItems = items.filter((it) => {
     if (hideAcquired && it.acquired) return false;
@@ -141,7 +184,40 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
   }
 
   const usedCategories = [...new Set(items.map((i) => i.category).filter(Boolean))] as string[];
+  const hasImage = slots.a !== null || slots.b !== null;
   return (
+    <>
+      {/* Full-height left image panel */}
+      <div
+        aria-hidden
+        className="fixed inset-y-0 left-0 pointer-events-none overflow-hidden"
+        style={{ width: 'calc((100vw - 80rem) / 2)' }}
+      >
+        {slots.a && (
+          <img
+            src={slots.a}
+            alt=""
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'a' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        {slots.b && (
+          <img
+            src={slots.b}
+            alt=""
+            className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ease-in-out ${slots.active === 'b' ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        {hasImage && (
+          <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-r from-transparent to-background" />
+        )}
+        {hasImage && hoveredItem && (
+          <div className="absolute bottom-0 inset-x-0 px-3 py-4 bg-gradient-to-t from-black/70 to-transparent">
+            <p className="text-white text-xs font-medium leading-tight line-clamp-2">
+              {hoveredItem.brand ? `${hoveredItem.brand} ` : ''}{hoveredItem.name}
+            </p>
+          </div>
+        )}
+      </div>
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -233,8 +309,8 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
             return (
               <div
                 key={item.id}
-                className={`rounded-xl border p-4 flex flex-col gap-3 transition-opacity ${isAcquired ? 'opacity-50' : 'hover:shadow-sm'}`}
-                onMouseEnter={() => setHoveredItem(item)}
+                className={`rounded-xl border bg-card p-4 flex flex-col gap-3 card-elevated transition-opacity ${isAcquired ? 'opacity-50 pointer-events-none' : ''}`}
+                onMouseEnter={() => handleItemHover(item)}
               >
                 {/* Top row */}
                 <div className="flex items-start justify-between gap-2">
@@ -411,5 +487,6 @@ export function WishlistClient({ initialItems }: { initialItems: WishlistItem[] 
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }

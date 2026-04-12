@@ -138,6 +138,7 @@ export const kitchenEquipment = sqliteTable('kitchen_equipment', {
   condition: text('condition').default('good'),
   notes: text('notes'),
   imagePath: text('image_path'),
+  productUrl: text('product_url'),
   purchasedDate: integer('purchased_date'),
   createdAt: integer('created_at').notNull(),
 });
