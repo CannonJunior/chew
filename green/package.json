@@ -1,0 +1,11 @@
+{
+  "name": "chew",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "default": "./index.ts"
+    }
+  }
+}
