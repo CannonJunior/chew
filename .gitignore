@@ -41,3 +41,8 @@ yarn-error.log*
 next-env.d.ts
 /uploads
 .env.local
+
+# SQLite runtime database — never commit
+*.db
+*.db-shm
+*.db-wal
