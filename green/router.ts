@@ -39,6 +39,7 @@ Respond with ONLY a JSON object, no other text:
 export async function routeChewImage(
   apiKey: string,
   imagePath: string,
+  model: string,
 ): Promise<ChewRouterResult> {
   const client = new Anthropic({ apiKey });
   console.log(`[chew/router] reading image: ${imagePath}`);
@@ -63,7 +64,7 @@ export async function routeChewImage(
   try {
     console.log('[chew/router] sending classification request to Claude');
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model,
       max_tokens: 256,
       messages: [{
         role: 'user',
