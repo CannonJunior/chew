@@ -406,15 +406,15 @@ export function RecipesClient({ initialRecipes }: { initialRecipes: Recipe[] }) 
                       )}
                       <button
                         onClick={(e) => toggleVote(r.id, 'up', e)}
-                        className={`${votes[r.id] === 'up' ? 'text-green-600' : 'text-muted-foreground hover:text-green-600'}`}
+                        className={`rounded p-0.5 ${votes[r.id] === 'up' ? 'text-green-600 border border-black' : 'text-muted-foreground hover:text-green-600'}`}
                       >
-                        <ThumbsUp className="w-4 h-4" />
+                        <ThumbsUp className={`w-4 h-4 ${votes[r.id] === 'up' ? 'fill-green-600' : ''}`} />
                       </button>
                       <button
                         onClick={(e) => toggleVote(r.id, 'down', e)}
-                        className={`${votes[r.id] === 'down' ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'}`}
+                        className={`rounded p-0.5 ${votes[r.id] === 'down' ? 'text-red-500 border border-black' : 'text-muted-foreground hover:text-red-500'}`}
                       >
-                        <ThumbsDown className="w-4 h-4" />
+                        <ThumbsDown className={`w-4 h-4 ${votes[r.id] === 'down' ? 'fill-red-500' : ''}`} />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}

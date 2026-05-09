@@ -126,6 +126,15 @@ export const recipeMedia = sqliteTable('recipe_media', {
   sortOrder: integer('sort_order').default(0),
 });
 
+// 1-5 ratings for liked recipes; used to weight future recipe search/generation
+export const recipeRatings = sqliteTable('recipe_ratings', {
+  recipeId: text('recipe_id').primaryKey().references(() => recipes.id),
+  picture: integer('picture'),   // visual appeal of the dish photo
+  quality: integer('quality'),   // perceived recipe quality / taste
+  uniqueness: integer('uniqueness'), // how novel/interesting the dish is
+  updatedAt: integer('updated_at').notNull(),
+});
+
 // ── Kitchen ──────────────────────────────────────────────────────────────────
 
 export const kitchenEquipment = sqliteTable('kitchen_equipment', {

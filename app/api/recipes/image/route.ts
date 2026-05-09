@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
 import { recipeMedia } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { newId } from '@/lib/utils/id';
 
 const UA = 'Chew Food Intelligence/1.0 (food app)';
 
@@ -192,8 +193,24 @@ export async function GET(req: NextRequest) {
     ? 'no-store'
     : 'public, max-age=86400, stale-while-revalidate=604800';
 
+  const sliced = images.slice(0, 8);
+
+  // Persist to DB so subsequent startups skip external API calls entirely
+  if (recipeId && sliced.length > 0 && offset === 0) {
+    db.insert(recipeMedia).values(
+      sliced.map((url, i) => ({
+        id: newId(),
+        recipeId,
+        type: 'image' as const,
+        urlOrPath: url,
+        isPrimary: i === 0 ? 1 : 0,
+        sortOrder: i,
+      }))
+    ).run();
+  }
+
   return NextResponse.json(
-    { images: images.slice(0, 8) },
+    { images: sliced },
     { headers: { 'Cache-Control': cacheControl } }
   );
 }

@@ -30,5 +30,12 @@
       "tag": "0003_pantry_tracking",
       "breakpoints": true
     }
+    ,{
+      "idx": 4,
+      "version": "6",
+      "when": 1746662400000,
+      "tag": "0004_recipe_ratings",
+      "breakpoints": true
+    }
   ]
 }

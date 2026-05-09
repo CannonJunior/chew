@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const UA = 'Chew Food Intelligence/1.0 (food app)';
 
+// Process-level cache: avoids re-fetching the same query during a session
+const imageCache = new Map<string, string[]>();
+
 async function searchCommons(query: string, limit = 8): Promise<string[]> {
   try {
     const params = new URLSearchParams({
@@ -96,6 +99,14 @@ export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q');
   if (!q) return NextResponse.json({ images: [] });
 
+  const cached = imageCache.get(q);
+  if (cached) {
+    return NextResponse.json(
+      { images: cached },
+      { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' } }
+    );
+  }
+
   const variants = searchVariants(q);
   const seen = new Set<string>();
   const images: string[] = [];
@@ -118,8 +129,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const sliced = images.slice(0, 8);
+  if (sliced.length > 0) imageCache.set(q, sliced);
+
   return NextResponse.json(
-    { images: images.slice(0, 8) },
+    { images: sliced },
     { headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800' } }
   );
 }
